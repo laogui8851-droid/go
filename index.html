@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>正在连接安全线路...</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.container{text-align:center;padding:40px 20px;max-width:500px;width:100%}
+.logo{font-size:28px;font-weight:700;color:#58a6ff;margin-bottom:30px;letter-spacing:2px}
+.spin{width:50px;height:50px;border:3px solid #21262d;border-top:3px solid #58a6ff;border-radius:50%;animation:s .8s linear infinite;margin:0 auto 24px}
+@keyframes s{to{transform:rotate(360deg)}}
+#msg{font-size:16px;color:#8b949e;line-height:1.8}
+.progress{margin-top:20px;background:#21262d;border-radius:4px;height:4px;overflow:hidden}
+.progress-bar{height:100%;background:linear-gradient(90deg,#58a6ff,#3fb950);width:0%;transition:width .3s;border-radius:4px}
+.links{margin-top:30px;display:none}
+.links a{display:block;margin:10px 0;padding:12px 20px;background:#21262d;color:#58a6ff;text-decoration:none;border-radius:8px;border:1px solid #30363d;transition:all .2s}
+.links a:hover{background:#30363d;border-color:#58a6ff}
+.links a .speed{float:right;color:#3fb950;font-size:13px}
+.links a.fail{color:#8b949e;border-color:#21262d}
+.links a.fail .speed{color:#f85149}
+.subtitle{font-size:13px;color:#484f58;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="logo">KVI GLOBAL</div>
+<div class="spin" id="spinner"></div>
+<div id="msg">正在为您检测最佳线路...</div>
+<div class="progress"><div class="progress-bar" id="bar"></div></div>
+<div class="links" id="links"></div>
+<div class="subtitle" id="sub"></div>
+</div>
+<script>
+(function(){
+    // ============ 配置域名列表 ============
+    // 在这里添加或修改你的服务域名
+    var domains = [
+        {name: '线路1', url: 'https://kiv.up.railway.app'},
+        {name: '线路2', url: 'https://kvi-app.fly.dev'}
+        // 后续买了域名可以加更多线路:
+        // {name: '线路3', url: 'https://你的域名.com'},
+    ];
+    // ======================================
+
+    var jumped = false;
+    var results = [];
+    var tested = 0;
+    var bar = document.getElementById('bar');
+    var msg = document.getElementById('msg');
+    var sub = document.getElementById('sub');
+
+    function testDomain(item) {
+        return new Promise(function(resolve) {
+            var start = Date.now();
+            var done = false;
+            var timer = setTimeout(function() {
+                if (!done) { done = true; resolve({item: item, ok: false, ms: 99999}); }
+            }, 5000);
+            
+            var img = new Image();
+            img.onload = img.onerror = function() {
+                if (!done) {
+                    done = true;
+                    clearTimeout(timer);
+                    var ms = Date.now() - start;
+                    resolve({item: item, ok: true, ms: ms});
+                }
+            };
+            img.src = item.url + '/favicon.ico?t=' + Date.now();
+        });
+    }
+
+    function updateBar() {
+        tested++;
+        bar.style.width = (tested / domains.length * 100) + '%';
+    }
+
+    function showManual() {
+        results.sort(function(a, b) { return a.ms - b.ms; });
+        var linksDiv = document.getElementById('links');
+        var html = '';
+        results.forEach(function(r) {
+            if (r.ok) {
+                html += '<a href="' + r.item.url + '">' + r.item.name + 
+                    '<span class="speed">' + r.ms + 'ms</span></a>';
+            } else {
+                html += '<a href="' + r.item.url + '" class="fail">' + r.item.name + 
+                    '<span class="speed">不可用</span></a>';
+            }
+        });
+        linksDiv.innerHTML = html;
+        linksDiv.style.display = 'block';
+    }
+
+    async function run() {
+        // 并行测试所有域名
+        var promises = domains.map(function(item) {
+            return testDomain(item).then(function(result) {
+                updateBar();
+                results.push(result);
+                
+                // 第一个成功的直接跳转
+                if (result.ok && !jumped) {
+                    jumped = true;
+                    msg.innerText = '已连接 ' + result.item.name + '（' + result.ms + 'ms），正在跳转...';
+                    document.getElementById('spinner').style.borderTopColor = '#3fb950';
+                    setTimeout(function() {
+                        window.location.href = result.item.url;
+                    }, 500);
+                }
+                return result;
+            });
+        });
+
+        await Promise.all(promises);
+
+        if (!jumped) {
+            msg.innerText = '自动检测完成，请手动选择线路：';
+            document.getElementById('spinner').style.display = 'none';
+            showManual();
+            sub.innerText = '如果所有线路均不可用，请检查网络或联系客服';
+        }
+    }
+
+    run();
+})();
+</script>
+</body>
+</html>
